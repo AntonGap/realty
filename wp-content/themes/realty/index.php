@@ -79,13 +79,15 @@ $container = get_theme_mod( 'understrap_container_type' );
 					</div>
 				</div>
 
-				<div class="row">
-					<div class="col-6">
-						<form method="post" id="createObject">
-							<h2>Добавить новый объект</h2>
+				<h2>Добавить новый объект</h2>
+					<form method="post" id="createObject">
+					<input type="hidden" name="nonce" value="<?php echo wp_create_nonce('newobjectform'); ?>" id="nonce"/>
+					<div class="ajax-reply"></div>
+					<div class="row">
+						<div class="col-12 col-sm-6 col-md-6">
 							<div class="mb-3">
 								<p class="form-label">Название объекта</p>
-								<p><input type="text" class="form-control" name="name"></p>
+								<p><input type="text" class="form-control" name="name" required="required"></p>
 							</div>
 							<div class="mb-3">
 								<p class="form-label">Описание объекта</p>
@@ -93,7 +95,11 @@ $container = get_theme_mod( 'understrap_container_type' );
 							</div>
 							<div class="mb-3">
 								<p class="form-label">Основное изображение</p>
-								<p><input type="file" class="form-control" name="thumbnail"></p>
+								<p><input type="file" class="form-control" name="thumbnail" accept="image/*" id="thumbnail"></p>
+							</div>
+							<div class="mb-3">
+								<p class="form-label">Галерея</p>
+								<p><input type="file" class="form-control" name="gallery" multiple="multiple" accept="image/*" id="gallery"></p>
 							</div>
 							<div class="mb-3">
 								<p class="form-label">Тип</p>
@@ -109,22 +115,16 @@ $container = get_theme_mod( 'understrap_container_type' );
 									}
 								?>
 							</div>
+						</div>
+							<div class="col-12 col-sm-6 col-md-6">
 							<div class="mb-3">
 								<p class="form-label">Город</p>
-								<?php
-									$query = new WP_Query;
-									$cities = $query->query([
-										'post_type' 	 => 'city',
-										'orderby' 		 => 'post_title',
-										'posts_per_page' => -1,
-										'order'			 => 'ASC'
-									]);
-								?>
 								<p>
 									<select class="form-select" name="post-parent">
 										<option value="0">Не выбрано</option>
-										<?php foreach($cities as $city) {?>
-											<option value="<?php echo $city->id; ?>"><?php echo $city->post_title; ?></option>
+										<?php while ( $cities->have_posts() ) {
+											$city = $cities->next_post(); ?>
+											<option value="<?php echo $city->ID; ?>"><?php echo $city->post_title; ?></option>
 										<?php } ?>
 									</select>
 								</p>
@@ -152,9 +152,9 @@ $container = get_theme_mod( 'understrap_container_type' );
 							<div class="col-12">
     							<button class="btn btn-primary" type="submit">Создать объект</button>
   							</div>
-						</form>
-					</div>
-				</div>
+						</div>
+						</div>
+					</form>
 			</main>
 
 			<?php

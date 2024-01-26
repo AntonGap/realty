@@ -36,14 +36,8 @@ function create_realty_taxonomies(){
 		],
 		'menu_icon'			 => 'dashicons-location-alt',
 		'public'             => true,
-		'publicly_queryable' => true,
-		'show_ui'            => true,
-		'show_in_menu'       => true,
-		'query_var'          => true,
-		'rewrite'            => true,
 		'capability_type'    => 'post',
 		'has_archive'        => true,
-		'hierarchical'       => false,
 		'supports'           => ['title','editor','thumbnail']
 	]);
 }
@@ -143,42 +137,103 @@ add_action( 'rest_api_init', function() {
 
 	$route = '/add';
 
-	// параметры конечной точки (маршрута)
 	$route_params = [
 		'methods'  => 'POST',
 		'callback' => 'create_post',
-		'data'     => [
-			'arg_str' => [
-				'type'     => 'string',
-				'required' => true,     
-			],
-		],
-		'permission_callback' => function( $request ) {
-			return true;
-		},
+		'permission_callback' => '__return_true'
 	];
 
 	register_rest_route( $namespace, $route, $route_params );
 
 } );
 
-// функция обработчик конечной точки (маршрута)
 function create_post( WP_REST_Request $request ) {
 
-	$fields = $request['data'];
+	$meta = [];
+	if(isset($request['_square']) && $request['_square'] !='') {
+		$meta['_square'] = $request['_square'];
+	}
+	if(isset($request['_price']) && $request['_price'] !='') {
+		$meta['_price'] = $request['_price'];
+	}
+	if(isset($request['_address']) && $request['_address'] !='') {
+		$meta['_address'] = $request['_address'];
+	}
+	if(isset($request['_livingsquare']) && $request['_livingsquare'] !='') {
+		$meta['_livingsquare'] = $request['_livingsquare'];
+	}
+	if(isset($request['_floor']) && $request['_floor'] !='') {
+		$meta['_floor'] = intval($request['_floor']);
+	}
+	
+	$postarr = array(
+		'post_author'    => 1,
+		'post_content'   => $request['description'],
+		'post_parent'    => intval($request['post-parent']),
+		'post_status'    => 'pending',
+		'post_title'     => $request['name'],
+		'post_type'      => 'realty',
+		'meta_input'     => $meta,
+	);
 
-	print_r(json_decode($fields, 1));
-	/*$posts = get_posts( [
-		'author' => (int) $request['id'],
-	] );
-
-	if ( empty( $posts ) ) {
-		return new WP_Error( 'no_author_posts', 'Записей не найдено', [ 'status' => 404 ] );
-	}*/
-
-	return 'hello';
+	$post_id = wp_insert_post( $postarr, true );
+	if( is_wp_error($post_id) ){
+		return ['success' => false, 'message' => $post_id->get_error_message()];
+	}
+	else {
+		if(isset($request['type'])) {
+			wp_set_post_terms( $post_id, $request['type'], 'realty_type' );
+		}
+		return ['success' => true, 'id' => $post_id];
+	}
 }
 
+add_action( 'wp_ajax_'.'ajax_fileload',        'ajax_file_upload_callback' );
+add_action( 'wp_ajax_nopriv_'.'ajax_fileload', 'ajax_file_upload_callback' );
+
+function ajax_file_upload_callback(){
+	check_ajax_referer( 'newobjectform', 'nonce' );
+
+	if( empty( $_FILES ) )
+		wp_send_json_error( 'Файлов нет...' );
+
+	require_once ABSPATH . 'wp-admin/includes/image.php';
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+	require_once ABSPATH . 'wp-admin/includes/media.php';
+
+	add_filter( 'upload_mimes', function( $mimes ){
+		return [
+			'jpg|jpeg|jpe' => 'image/jpeg',
+			'gif'          => 'image/gif',
+			'png'          => 'image/png',
+		];
+	} );
+
+	$uploaded_imgs = array();
+	$post_id = $_POST['post_id'];
+	$is_gallery = false;
+	if(isset($_POST['is_gallery'])) {
+		$is_gallery = $_POST['is_gallery'];
+	}
+
+	foreach( $_FILES as $file_id => $data ){
+		$attach_id = media_handle_upload( $file_id, $post_id );
+
+		if( is_wp_error( $attach_id ) )
+			$uploaded_imgs[] = 'Ошибка загрузки файла `'. $data['name'] .'`: '. $attach_id->get_error_message();
+		else
+			$uploaded_imgs[] = $attach_id;
+	}
+
+	if(!$is_gallery) {
+		set_post_thumbnail($post_id, $uploaded_imgs[0]);
+	} else {
+		update_post_meta( $post_id, '_image_gallery', implode(',', $uploaded_imgs) );
+	}
+
+	wp_send_json_success( $uploaded_imgs );
+
+}
 
 function pre($val) {
 	echo '<pre>';
